@@ -68,15 +68,8 @@ func greetMePlease(ctx context.Context, client pb.GreeterClient, request *pb.Hel
 var connectionCount = 1
 var loopCount = 10
 
-func connect(ws *sync.WaitGroup) {
+func connect(ws *sync.WaitGroup, ctx context.Context, client pb.GreeterClient) {
 	defer ws.Done()
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(host+":"+port, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
 
 	// Contact the server and print out its response.
 	name := defaultName
@@ -84,10 +77,8 @@ func connect(ws *sync.WaitGroup) {
 		name = os.Args[2]
 	}
 
-	ctx := context.Background()
-
 	for i := 0; i < loopCount; i++ {
-		err = greetMePlease(ctx, c, &pb.HelloRequest{Name: name + "-" + strconv.Itoa(i)})
+		err := greetMePlease(ctx, client, &pb.HelloRequest{Name: name + "-" + strconv.Itoa(i)})
 
 		if err != nil {
 			fmt.Println("in connect" + err.Error())
@@ -125,9 +116,17 @@ func main() {
 	ws.Add(connectionCount)
 
 	startTime := time.Now()
+	ctx := context.Background()
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(host+":"+port, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	client := pb.NewGreeterClient(conn)
 
 	for i := 0; i < connectionCount; i++ {
-		go connect(&ws)
+		go connect(&ws, ctx, client)
 	}
 
 	ws.Wait()
